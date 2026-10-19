@@ -1,0 +1,53 @@
+# Builds the loader (black.exe + blackrt.dll, 32-bit, RelWithDebInfo) on a GitHub-hosted Windows runner and
+# publishes the binaries with their PDBs as an artifact. Mirrors loader/README.md: cmake --preset, then cmake --build.
+name: Build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # loader/CMakePresets.json has a preset per Visual Studio generation (win32 = VS 2026, win32-vs2022 = VS 2022).
+      # Pick the one matching the runner's Visual Studio, provided its CMake knows that generator.
+      - name: Pick the CMake preset for the runner's Visual Studio
+        id: preset
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsVersion = & $vswhere -latest -products * -property installationVersion
+          $generators = cmake --help | Out-String
+          Write-Host "Visual Studio $vsVersion, $(cmake --version | Select-Object -First 1)"
+          if ($vsVersion -like '18.*' -and $generators -match 'Visual Studio 18 2026') {
+            $preset = 'win32'
+          } elseif ($generators -match 'Visual Studio 17 2022') {
+            $preset = 'win32-vs2022'
+          } else {
+            throw "No Visual Studio 2022/2026 generator available (VS $vsVersion)"
+          }
+          Write-Host "preset $preset"
+          "preset=$preset" >> $env:GITHUB_OUTPUT
+          "dir=build/$preset" >> $env:GITHUB_OUTPUT
+          "sha=$($env:GITHUB_SHA.Substring(0, 7))" >> $env:GITHUB_OUTPUT
+
+      - name: Configure
+        working-directory: loader
+        run: cmake --preset ${{ steps.preset.outputs.preset }}
+
+      - name: Build (Win32, RelWithDebInfo)
+        working-directory: loader
+        run: cmake --build ${{ steps.preset.outputs.dir }} --config RelWithDebInfo
+
+      - name: Upload black.exe, blackrt.dll and PDBs
+        uses: actions/upload-artifact@v4
+        with:
+          name: black-pc-${{ steps.preset.outputs.sha }}
+          if-no-files-found: error
+          path: |
+            loader/${{ steps.preset.outputs.dir }}/RelWithDebInfo/black.exe
+            loader/${{ steps.preset.outputs.dir }}/RelWithDebInfo/blackrt.dll
+            loader/${{ steps.preset.outputs.dir }}/RelWithDebInfo/*.pdb
