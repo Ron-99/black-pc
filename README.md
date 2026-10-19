@@ -109,6 +109,11 @@ Version 1.10.3 ensures maximum Vulkan compatibility for integrated GPUs (like th
    cp dxvk-1.10.3/x32/d3d9.dll /path/to/game/port/
    cp dxvk-1.10.3/x32/dxgi.dll /path/to/game/port/
    ```
+3. Install Microsoft's shader compiler (`d3dcompiler_47.dll`, 32-bit) into the Wine prefix:
+   ```bash
+   winetricks d3dcompiler_47
+   ```
+   Without it the port's shaders are compiled by Wine's own `d3dcompiler_47`, which produces vertex shaders that DXVK rejects: the game closes right after a mission loads (`std::out_of_range ... array::at: __n (which is 32)` in Wine's output). Instead of winetricks you can copy `C:\Windows\SysWOW64\d3dcompiler_47.dll` from a Windows 10/11 PC into the `port` folder (SysWOW64, not System32: the port is 32-bit).
 
 ### Phase 4: File Cleanup and Execution
 Windows `.zip` archives extracted on Linux might generate files with literal backslashes (`\`) in their names. We must clean this up.
@@ -123,10 +128,12 @@ Windows `.zip` archives extracted on Linux might generate files with literal bac
    mv 'port\LICENSE.txt' LICENSE.txt
    mv 'port\README.md' README.md
    ```
-3. Run the game, forcing Wine to use the native DXVK libraries we just copied:
+3. Run the game, forcing Wine to use the native DXVK libraries and shader compiler:
    ```bash
-   WINEDLLOVERRIDES="d3d9=n;dxgi=n" wine black.exe
+   WINEDLLOVERRIDES="d3d9=n;dxgi=n;d3dcompiler_47=n,b" wine black.exe
    ```
+
+**macOS** (Wine wrappers with DXVK, such as Highball, on Apple Silicon): the same applies. Install `d3dcompiler_47` into the bottle (or copy the DLL next to `black.exe`) and add `d3dcompiler_47=n,b` to the bottle's `WINEDLLOVERRIDES`.
 
 ---
 
@@ -292,6 +299,11 @@ A versão 1.10.3 garante compatibilidade máxima de Vulkan para placas de vídeo
    cp dxvk-1.10.3/x32/d3d9.dll /caminho/para/jogo/port/
    cp dxvk-1.10.3/x32/dxgi.dll /caminho/para/jogo/port/
    ```
+3. Instale o compilador de shaders da Microsoft (`d3dcompiler_47.dll`, 32 bits) no prefixo do Wine:
+   ```bash
+   winetricks d3dcompiler_47
+   ```
+   Sem ele, os shaders do port são compilados pelo `d3dcompiler_47` do próprio Wine, que gera vertex shaders que o DXVK rejeita: o jogo fecha logo depois de carregar uma missão (`std::out_of_range ... array::at: __n (which is 32)` na saída do Wine). Em vez do winetricks, você pode copiar `C:\Windows\SysWOW64\d3dcompiler_47.dll` de um PC com Windows 10/11 para a pasta `port` (SysWOW64, não System32: o port é de 32 bits).
 
 ### Fase 4: Limpeza de Arquivos e Execução
 Como arquivos `.zip` criados no Windows geram nomes com barras invertidas literais (`\`) ao serem extraídos no Linux, é necessário limpar a sujeira.
@@ -306,10 +318,12 @@ Como arquivos `.zip` criados no Windows geram nomes com barras invertidas litera
    mv 'port\LICENSE.txt' LICENSE.txt
    mv 'port\README.md' README.md
    ```
-3. Execute o jogo forçando o Wine a utilizar as bibliotecas nativas do DXVK que copiamos:
+3. Execute o jogo forçando o Wine a utilizar as bibliotecas nativas do DXVK e o compilador de shaders:
    ```bash
-   WINEDLLOVERRIDES="d3d9=n;dxgi=n" wine black.exe
+   WINEDLLOVERRIDES="d3d9=n;dxgi=n;d3dcompiler_47=n,b" wine black.exe
    ```
+
+**macOS** (wrappers do Wine com DXVK, como o Highball, em Apple Silicon): vale o mesmo. Instale o `d3dcompiler_47` no bottle (ou copie a DLL para junto do `black.exe`) e adicione `d3dcompiler_47=n,b` ao `WINEDLLOVERRIDES` do bottle.
 
 ---
 
