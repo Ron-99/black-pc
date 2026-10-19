@@ -853,16 +853,28 @@ void draw_indexed_up(uint32_t xprim, uint32_t nidx, const uint16_t *idx, const v
     Prim p = conv_prim(xprim, nidx);
     if (!p.count) return;
     perf::add_draw(mx - mn + 1, (mx - mn + 1) * stride);
+    // Indices are rebased to the lowest one and the data pointer moved to that vertex. Windows' D3D9 reads only
+    // vertices mn..mx, but DXVK copies everything from the pointer up to vertex mx, and DrawIndexedVertices
+    // passes a pointer mn vertices before its converted block: DXVK then read memory in front of it and
+    // crashed (Wine/Proton, ucrtbase memcpy) when that was unmapped.
+    const uint16_t base = (uint16_t)mn;
     if (p.quads) {
         g_tmp_indices.resize(p.count * 3);
         for (uint32_t q = 0; q < nidx / 4; q++) {
             const uint16_t *s = idx + q * 4;
             uint16_t *o = &g_tmp_indices[q * 6];
-            o[0] = s[0]; o[1] = s[1]; o[2] = s[2]; o[3] = s[0]; o[4] = s[2]; o[5] = s[3];
+            uint16_t a = (uint16_t)(s[0] - base), b = (uint16_t)(s[1] - base), c = (uint16_t)(s[2] - base),
+                     e = (uint16_t)(s[3] - base);
+            o[0] = a; o[1] = b; o[2] = c; o[3] = a; o[4] = c; o[5] = e;
         }
         idx = g_tmp_indices.data();
+    } else if (base) {
+        g_tmp_indices.resize(nidx);
+        for (uint32_t i = 0; i < nidx; i++) g_tmp_indices[i] = (uint16_t)(idx[i] - base);
+        idx = g_tmp_indices.data();
     }
-    host3d::dev()->DrawIndexedPrimitiveUP(p.type, mn, mx - mn + 1, p.count, idx, D3DFMT_INDEX16, verts, stride);
+    host3d::dev()->DrawIndexedPrimitiveUP(p.type, 0, mx - mn + 1, p.count, idx, D3DFMT_INDEX16,
+                                          (const uint8_t *)verts + (size_t)mn * stride, stride);
 }
 
 const uint8_t *stream_data(uint32_t stream)
